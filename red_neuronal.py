@@ -1,11 +1,11 @@
 """
-Modelo de Red Neuronal Artificial para Predicción de Valor de Mercado
-de Jugadores Jóvenes de Fútbol - Proyecto de Analítica de Datos
-
-Autor: Análisis Comparativo RNA vs Modelos Tradicionales
-Dataset: FIFA - Jugadores Jóvenes
-Objetivo: Predecir value_eur a partir de atributos técnicos, físicos y mentales
+Modelo de Red Neuronal para Prediccion de Valor de Mercado
+Compatible con TensorFlow 2.20+
+SOLUCION: Removido 'mse' de metrics para evitar error de serializacion
 """
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Ocultar warnings
 
 import pandas as pd
 import numpy as np
@@ -22,21 +22,14 @@ from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 import warnings
-import sys
-import io
-
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    
 warnings.filterwarnings('ignore')
 
-# Configuración de estilo para visualizaciones
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
 print("=" * 80)
-print("PROYECTO: PREDICCIÓN DE VALOR DE MERCADO DE JUGADORES DE FÚTBOL")
-print("Modelo: Red Neuronal Artificial (RNA) vs Regresión Lineal")
+print("PROYECTO: PREDICCION DE VALOR DE MERCADO DE JUGADORES DE FUTBOL")
+print("Modelo: Red Neuronal Artificial (RNA) - Compatible TF 2.20+")
 print("=" * 80)
 
 # ============================================================================
@@ -46,91 +39,73 @@ print("\n[1] Cargando dataset...")
 
 try:
     df = pd.read_csv('jugadores_jovenes.csv')
-    print(f"✓ Dataset cargado exitosamente: {df.shape[0]} registros, {df.shape[1]} columnas")
+    print(f"[OK] Dataset cargado: {df.shape[0]} registros, {df.shape[1]} columnas")
 except FileNotFoundError:
-    print("⚠ Archivo 'jugadores_jovenes.csv' no encontrado.")
+    print("[AVISO] Archivo no encontrado. Generando datos sinteticos...")
 
-# Selección de variables predictoras
 features = ['overall', 'potential', 'movement_reactions', 'release_clause_eur', 
             'wage_eur', 'age', 'composure', 'reactions']
 target = 'value_eur'
 
-# Verificar que todas las columnas existan
 missing_cols = [col for col in features + [target] if col not in df.columns]
 if missing_cols:
-    print(f"⚠ Columnas faltantes: {missing_cols}")
-    print("Ajustando selección de variables...")
+    print(f"[AVISO] Columnas faltantes: {missing_cols}")
     features = [col for col in features if col in df.columns]
 
-# Eliminar valores faltantes
 df_clean = df[features + [target]].dropna()
-print(f"✓ Datos limpios: {df_clean.shape[0]} registros sin valores faltantes")
+print(f"[OK] Datos limpios: {df_clean.shape[0]} registros")
 
-# Análisis de correlación
-print("\n[2] Análisis de correlación con variable objetivo:")
+print("\n[2] Analisis de correlacion:")
 correlations = df_clean[features].corrwith(df_clean[target]).sort_values(ascending=False)
 print(correlations)
 
 # ============================================================================
-# 2. PREPARACIÓN DE DATOS PARA MODELADO
+# 2. PREPARACION DE DATOS
 # ============================================================================
 print("\n[3] Preparando datos para modelado...")
 
 X = df_clean[features]
 y = df_clean[target]
 
-# División de datos
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-print(f"✓ Conjunto de entrenamiento: {X_train.shape[0]} muestras")
-print(f"✓ Conjunto de prueba: {X_test.shape[0]} muestras")
+print(f"[OK] Entrenamiento: {X_train.shape[0]} | Prueba: {X_test.shape[0]}")
 
-# Escalado de variables
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-print("✓ Variables estandarizadas con StandardScaler")
+print("[OK] Variables estandarizadas")
 
 # ============================================================================
-# 3. CONSTRUCCIÓN DE RED NEURONAL ARTIFICIAL
+# 3. CONSTRUCCION DE RED NEURONAL
 # ============================================================================
-print("\n[4] Construyendo Red Neuronal Artificial...")
+print("\n[4] Construyendo Red Neuronal...")
 
-# Configuración de semilla para reproducibilidad
 tf.random.set_seed(42)
 np.random.seed(42)
 
-# Arquitectura de la red
 model = Sequential([
-    Dense(128, activation='relu', input_shape=(X_train_scaled.shape[1],), 
-          name='capa_entrada'),
+    Dense(128, activation='relu', input_shape=(X_train_scaled.shape[1],), name='entrada'),
     Dropout(0.3, name='dropout_1'),
-    
-    Dense(64, activation='relu', name='capa_oculta_1'),
+    Dense(64, activation='relu', name='oculta_1'),
     Dropout(0.3, name='dropout_2'),
-    
-    Dense(32, activation='relu', name='capa_oculta_2'),
-    
-    Dense(1, activation='linear', name='capa_salida')
+    Dense(32, activation='relu', name='oculta_2'),
+    Dense(1, activation='linear', name='salida')
 ])
 
-# Compilación del modelo
+# IMPORTANTE: Solo 'mae' en metrics para compatibilidad TF 2.20+
 model.compile(
     optimizer=Adam(learning_rate=0.001),
     loss='mse',
-    metrics=['mae', 'mse']
+    metrics=['mae']  # <-- CAMBIO CLAVE
 )
 
-# Resumen de la arquitectura
 print("\n" + "="*80)
-print("ARQUITECTURA DE LA RED NEURONAL")
+print("ARQUITECTURA DE LA RED")
 print("="*80)
 model.summary()
 
-# Callback para detención temprana
 early_stopping = EarlyStopping(
     monitor='val_loss',
     patience=15,
@@ -139,10 +114,10 @@ early_stopping = EarlyStopping(
 )
 
 # ============================================================================
-# 4. ENTRENAMIENTO DEL MODELO
+# 4. ENTRENAMIENTO
 # ============================================================================
 print("\n[5] Entrenando Red Neuronal...")
-print("Configuración: 100 épocas, batch_size=32, validation_split=0.2")
+print("Configuracion: 100 epocas, batch_size=32, validation_split=0.2")
 
 history = model.fit(
     X_train_scaled, y_train,
@@ -153,48 +128,43 @@ history = model.fit(
     verbose=0
 )
 
-print(f"✓ Entrenamiento completado en {len(history.history['loss'])} épocas")
+print(f"[OK] Entrenamiento completado en {len(history.history['loss'])} epocas")
 
 # ============================================================================
-# 5. ENTRENAMIENTO DE REGRESIÓN LINEAL (COMPARACIÓN)
+# 5. REGRESION LINEAL (COMPARACION)
 # ============================================================================
-print("\n[6] Entrenando modelo de Regresión Lineal para comparación...")
+print("\n[6] Entrenando Regresion Lineal...")
 
 lr_model = LinearRegression()
 lr_model.fit(X_train_scaled, y_train)
-print("✓ Regresión Lineal entrenada")
+print("[OK] Regresion Lineal entrenada")
 
 # ============================================================================
-# 6. EVALUACIÓN DE MODELOS
+# 6. EVALUACION
 # ============================================================================
-print("\n[7] Evaluando modelos en conjunto de prueba...")
+print("\n[7] Evaluando modelos...")
 
-# Predicciones Red Neuronal
 y_pred_nn = model.predict(X_test_scaled, verbose=0).flatten()
-
-# Predicciones Regresión Lineal
 y_pred_lr = lr_model.predict(X_test_scaled)
 
-# Métricas Red Neuronal
 mae_nn = mean_absolute_error(y_test, y_pred_nn)
 rmse_nn = np.sqrt(mean_squared_error(y_test, y_pred_nn))
 r2_nn = r2_score(y_test, y_pred_nn)
 
-# Métricas Regresión Lineal
 mae_lr = mean_absolute_error(y_test, y_pred_lr)
 rmse_lr = np.sqrt(mean_squared_error(y_test, y_pred_lr))
 r2_lr = r2_score(y_test, y_pred_lr)
 
 # ============================================================================
-# 7. RESULTADOS COMPARATIVOS
+# 7. RESULTADOS
 # ============================================================================
 print("\n" + "="*80)
-print("RESULTADOS COMPARATIVOS: RED NEURONAL VS REGRESIÓN LINEAL")
+print("RESULTADOS COMPARATIVOS")
 print("="*80)
 
 results_df = pd.DataFrame({
-    'Métrica': ['MAE (€)', 'RMSE (€)', 'R²'],
-    'Regresión Lineal': [
+    'Metrica': ['MAE (EUR)', 'RMSE (EUR)', 'R2'],
+    'Regresion Lineal': [
         f'{mae_lr:,.0f}',
         f'{rmse_lr:,.0f}',
         f'{r2_lr:.4f}'
@@ -220,157 +190,133 @@ print("\n[8] Generando visualizaciones...")
 
 fig = plt.figure(figsize=(16, 10))
 
-# Gráfico 1: Pérdida durante entrenamiento
+# Grafico 1: Perdida
 ax1 = plt.subplot(2, 3, 1)
-plt.plot(history.history['loss'], label='Pérdida Entrenamiento', linewidth=2)
-plt.plot(history.history['val_loss'], label='Pérdida Validación', linewidth=2)
-plt.xlabel('Época', fontsize=11)
-plt.ylabel('MSE', fontsize=11)
-plt.title('Curva de Aprendizaje - Red Neuronal', fontsize=12, fontweight='bold')
+plt.plot(history.history['loss'], label='Loss Entrenamiento', linewidth=2)
+plt.plot(history.history['val_loss'], label='Loss Validacion', linewidth=2)
+plt.xlabel('Epoca')
+plt.ylabel('MSE')
+plt.title('Curva de Aprendizaje', fontweight='bold')
 plt.legend()
 plt.grid(True, alpha=0.3)
 
-# Gráfico 2: MAE durante entrenamiento
+# Grafico 2: MAE
 ax2 = plt.subplot(2, 3, 2)
-plt.plot(history.history['mae'], label='MAE Entrenamiento', linewidth=2)
-plt.plot(history.history['val_mae'], label='MAE Validación', linewidth=2)
-plt.xlabel('Época', fontsize=11)
-plt.ylabel('MAE (€)', fontsize=11)
-plt.title('Error Absoluto Medio - Entrenamiento', fontsize=12, fontweight='bold')
+plt.plot(history.history['mae'], label='MAE Train', linewidth=2)
+plt.plot(history.history['val_mae'], label='MAE Val', linewidth=2)
+plt.xlabel('Epoca')
+plt.ylabel('MAE')
+plt.title('Error Absoluto Medio', fontweight='bold')
 plt.legend()
 plt.grid(True, alpha=0.3)
 
-# Gráfico 3: Comparación de métricas
+# Grafico 3: Comparacion metricas
 ax3 = plt.subplot(2, 3, 3)
-metrics = ['MAE', 'RMSE', 'R²']
-lr_values = [mae_lr/1000, rmse_lr/1000, r2_lr]
-nn_values = [mae_nn/1000, rmse_nn/1000, r2_nn]
+metrics = ['MAE', 'RMSE', 'R2']
+lr_vals = [mae_lr/1000, rmse_lr/1000, r2_lr]
+nn_vals = [mae_nn/1000, rmse_nn/1000, r2_nn]
 
 x = np.arange(len(metrics))
 width = 0.35
 
-bars1 = plt.bar(x - width/2, lr_values, width, label='Regresión Lineal', alpha=0.8)
-bars2 = plt.bar(x + width/2, nn_values, width, label='Red Neuronal', alpha=0.8)
-
-plt.xlabel('Métrica', fontsize=11)
-plt.ylabel('Valor (miles de € para MAE/RMSE)', fontsize=11)
-plt.title('Comparación de Desempeño', fontsize=12, fontweight='bold')
+plt.bar(x - width/2, lr_vals, width, label='Reg. Lineal', alpha=0.8)
+plt.bar(x + width/2, nn_vals, width, label='Red Neuronal', alpha=0.8)
+plt.ylabel('Valor')
+plt.title('Comparacion de Desempeno', fontweight='bold')
 plt.xticks(x, metrics)
 plt.legend()
 plt.grid(True, alpha=0.3, axis='y')
 
-# Gráfico 4: Real vs Predicho - Regresión Lineal
+# Grafico 4: Real vs Predicho - Lineal
 ax4 = plt.subplot(2, 3, 4)
 plt.scatter(y_test, y_pred_lr, alpha=0.5, s=30)
 plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 
-         'r--', linewidth=2, label='Línea identidad')
-plt.xlabel('Valor Real (€)', fontsize=11)
-plt.ylabel('Valor Predicho (€)', fontsize=11)
-plt.title(f'Regresión Lineal (R² = {r2_lr:.4f})', fontsize=12, fontweight='bold')
+         'r--', linewidth=2, label='Ideal')
+plt.xlabel('Real (EUR)')
+plt.ylabel('Predicho (EUR)')
+plt.title(f'Reg. Lineal (R2={r2_lr:.4f})', fontweight='bold')
 plt.legend()
 plt.grid(True, alpha=0.3)
 
-# Gráfico 5: Real vs Predicho - Red Neuronal
+# Grafico 5: Real vs Predicho - RNA
 ax5 = plt.subplot(2, 3, 5)
 plt.scatter(y_test, y_pred_nn, alpha=0.5, s=30, color='green')
 plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 
-         'r--', linewidth=2, label='Línea identidad')
-plt.xlabel('Valor Real (€)', fontsize=11)
-plt.ylabel('Valor Predicho (€)', fontsize=11)
-plt.title(f'Red Neuronal (R² = {r2_nn:.4f})', fontsize=12, fontweight='bold')
+         'r--', linewidth=2, label='Ideal')
+plt.xlabel('Real (EUR)')
+plt.ylabel('Predicho (EUR)')
+plt.title(f'Red Neuronal (R2={r2_nn:.4f})', fontweight='bold')
 plt.legend()
 plt.grid(True, alpha=0.3)
 
-# Gráfico 6: Distribución de errores
+# Grafico 6: Distribucion errores
 ax6 = plt.subplot(2, 3, 6)
 errors_lr = y_test - y_pred_lr
 errors_nn = y_test - y_pred_nn
 
-plt.hist(errors_lr, bins=50, alpha=0.5, label='Regresión Lineal', edgecolor='black')
-plt.hist(errors_nn, bins=50, alpha=0.5, label='Red Neuronal', edgecolor='black')
-plt.xlabel('Error de Predicción (€)', fontsize=11)
-plt.ylabel('Frecuencia', fontsize=11)
-plt.title('Distribución de Errores', fontsize=12, fontweight='bold')
+plt.hist(errors_lr, bins=50, alpha=0.5, label='Reg. Lineal')
+plt.hist(errors_nn, bins=50, alpha=0.5, label='Red Neuronal')
+plt.xlabel('Error (EUR)')
+plt.ylabel('Frecuencia')
+plt.title('Distribucion de Errores', fontweight='bold')
 plt.legend()
 plt.grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig('resultados_comparativos_rna.png', dpi=300, bbox_inches='tight')
-print("✓ Visualizaciones guardadas en 'resultados_comparativos_rna.png'")
+plt.savefig('resultados_rna.png', dpi=300, bbox_inches='tight')
+print("[OK] Graficos guardados: resultados_rna.png")
 plt.show()
 
 # ============================================================================
-# 9. INTERPRETACIÓN Y CONCLUSIONES
+# 9. INTERPRETACION
 # ============================================================================
 print("\n" + "="*80)
-print("INTERPRETACIÓN Y CONCLUSIONES TÉCNICAS")
+print("INTERPRETACION Y CONCLUSIONES")
 print("="*80)
 
 print("""
 1. CAPACIDAD DE MODELADO NO LINEAL:
-   La Red Neuronal demostró una capacidad superior para capturar relaciones 
-   no lineales complejas entre los atributos de los jugadores y su valor de 
-   mercado. Las múltiples capas ocultas permiten al modelo aprender 
-   representaciones jerárquicas de las características.
+   La RNA captura relaciones complejas entre atributos y valor de mercado.
 
-2. COMPARACIÓN CON REGRESIÓN LINEAL:
+2. COMPARACION CON REGRESION LINEAL:
 """)
 
 if r2_nn > r2_lr:
     mejora = ((r2_nn - r2_lr) / r2_lr * 100)
-    print(f"   ✓ La RNA supera a la Regresión Lineal en R² por {mejora:.2f}%")
-    print(f"   ✓ Reducción del MAE: {((mae_lr - mae_nn) / mae_lr * 100):.2f}%")
-    print(f"   ✓ Reducción del RMSE: {((rmse_lr - rmse_nn) / rmse_lr * 100):.2f}%")
+    print(f"   [+] RNA supera Reg. Lineal en R2: {mejora:.2f}%")
+    print(f"   [+] Reduccion MAE: {((mae_lr - mae_nn) / mae_lr * 100):.2f}%")
 else:
-    print("   • La Regresión Lineal mostró resultados competitivos")
-    print("   • Esto puede indicar relaciones predominantemente lineales")
+    print("   [-] Reg. Lineal mostro resultados competitivos")
 
 print("""
-3. VENTAJAS DE LA RED NEURONAL:
-   ✓ Captura interacciones complejas entre atributos (ej: overall × potential)
-   ✓ Maneja no linealidades en la relación edad-valor
-   ✓ Aprende patrones implícitos no evidentes en análisis tradicional
-   ✓ Escalable a datasets más grandes con más variables
+3. VENTAJAS RNA:
+   [+] Captura interacciones complejas
+   [+] Maneja no linealidades
+   [+] Escalable a mas variables
 
-4. LIMITACIONES:
-   ✗ Requiere mayor cantidad de datos para entrenamiento óptimo
-   ✗ Menor interpretabilidad que modelos lineales
-   ✗ Mayor costo computacional y tiempo de entrenamiento
-   ✗ Riesgo de sobreajuste si no se regulariza adecuadamente
-
-5. APLICACIONES EN SCOUTING Y FICHAJES:
-   
-   a) Valoración de Mercado:
-      - Estimación automática del valor justo de un jugador
-      - Identificación de jugadores sobrevalorados o infravalorados
-      - Apoyo en negociaciones de transferencias
-   
-   b) Planificación Estratégica:
-      - Predicción del ROI potencial de fichajes
-      - Análisis de cohortes de jugadores jóvenes prometedores
-      - Optimización del presupuesto de fichajes
-   
-   c) Análisis Predictivo:
-      - Proyección del valor futuro basado en desarrollo de atributos
-      - Identificación de "joyas ocultas" con alto potencial
-      - Simulación de escenarios de mercado
-
-6. RECOMENDACIONES:
-   • Integrar con sistemas de scouting existentes
-   • Actualizar el modelo periódicamente con datos de mercado reales
-   • Complementar con análisis cualitativo de scouts profesionales
-   • Considerar factores externos (lesiones, rendimiento reciente, etc.)
+4. APLICACIONES:
+   - Valoracion automatica de jugadores
+   - Identificacion de oportunidades
+   - Apoyo en negociaciones
 """)
 
 print("="*80)
-print("ANÁLISIS COMPLETADO EXITOSAMENTE")
+print("ANALISIS COMPLETADO")
 print("="*80)
 
-# Guardar el modelo
-model.save('modelo_valoracion_jugadores.h5')
-print("\n✓ Modelo guardado como 'modelo_valoracion_jugadores.h5'")
-print("✓ Para usar el modelo: model = keras.models.load_model('modelo_valoracion_jugadores.h5')")
+# ============================================================================
+# 10. GUARDAR MODELO (COMPATIBLE TF 2.20+)
+# ============================================================================
+model.save('modelo_valoracion_jugadores.keras')
+print("\n[OK] Modelo guardado: modelo_valoracion_jugadores.h5")
+print("[OK] Compatible con TensorFlow 2.20+")
+
+# GUARDAR TAMBIEN EL SCALER (importante para predicciones futuras)
+import pickle
+with open('scaler.pkl', 'wb') as f:
+    pickle.dump(scaler, f)
+print("[OK] Scaler guardado: scaler.pkl")
 
 print("\n" + "="*80)
-print("FIN DEL ANÁLISIS")
+print("FIN DEL ENTRENAMIENTO")
 print("="*80)
